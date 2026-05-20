@@ -1,0 +1,19 @@
+# Ignore local environment keys
+.env
+.env.local
+
+# Ignore backend vendor packages and caches
+/backend/vendor/
+/backend/bootstrap/cache/
+/backend/storage/*.key
+
+# Ignore frontend dependencies and build logs
+/mobile/.dart_tool/
+/mobile/.packages
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/build/
+
+# Ignore system junk files
+.DS_Store
+Thumbs.db

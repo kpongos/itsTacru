@@ -1,7 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // Safe web detector
-import 'dart:io' show Platform; // Kept safe behind conditions
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -14,88 +13,72 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepPurple),
-      home: const ApiTestScreen(),
+      home: const ProtocolDashboard(),
     );
   }
 }
 
-class ApiTestScreen extends StatefulWidget {
-  const ApiTestScreen({super.key});
+class ProtocolDashboard extends StatefulWidget {
+  const ProtocolDashboard({super.key});
 
   @override
-  State<ApiTestScreen> createState() => _ApiTestScreenState();
+  State<ProtocolDashboard> createState() => _ProtocolDashboardState();
 }
 
-class _ApiTestScreenState extends State<ApiTestScreen> {
-  String _backendMessage = "Press the button to fetch data";
-  bool _isLoading = false;
+class _ProtocolDashboardState extends State<ProtocolDashboard> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  List<dynamic> _protocols = [];
+  bool _isLoading = true;
 
-  Future<void> fetchBackendData() async {
-    setState(() {
-      _isLoading = true;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchProtocols();
+  }
 
-    String baseUrl = 'http://localhost';
-
-    // 1. Check if running in a web browser first to avoid Platform crashes
-    if (kIsWeb) {
-      baseUrl = 'http://localhost'; 
-    } 
-    // 2. If it's not a web browser, it's safe to use the native Platform utility
-    else if (Platform.isAndroid) {
-      baseUrl = 'http://10.0.2.2'; // Target for native Android emulators
-    }
-
+  Future<void> _fetchProtocols() async {
     try {
-      final dio = Dio();
-      final response = await dio.get('$baseUrl/api/test-message');
-      
-      setState(() {
-        _backendMessage = response.data['message'];
-      });
+      final response = await http.get(Uri.parse('http://10.0.2.2/api/protocols'));
+      if (response.statusCode == 200) {
+        setState(() {
+          _protocols = json.decode(response.body);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _backendMessage = "Failed connecting to backend: $e";
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint("Error fetching protocols: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bls = _protocols.where((p) => p['type'] == 'BLS').toList();
+    final als = _protocols.where((p) => p['type'] == 'ALS').toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('itsTacru Full-Stack Core'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('TACRU Protocols'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [Tab(text: 'BLS'), Tab(text: 'ALS')],
+        ),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : TabBarView(
+            controller: _tabController,
             children: [
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else
-                Text(
-                  _backendMessage,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                ),
-              const SizedBox(height: 30),
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : fetchBackendData,
-                icon: const Icon(Icons.cloud_download),
-                label: const Text('Fetch Message From Docker'),
+              ListView.builder(
+                itemCount: bls.length,
+                itemBuilder: (context, i) => ListTile(title: Text(bls[i]['title'])),
+              ),
+              ListView.builder(
+                itemCount: als.length,
+                itemBuilder: (context, i) => ListTile(title: Text(als[i]['title'])),
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 }
